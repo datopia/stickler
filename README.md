@@ -9,14 +9,14 @@ Clojure-idiomatic protobuf3 schema generation & codec functionality.
 protobuf->edn schema generation library.
 
 [![Clojars
-Project](http://clojars.org/io.datopia/sticker-translate/latest-version.svg)](http://clojars.org/io.datopia/stickler-translate)
+Project](http://clojars.org/io.datopia/stickler-translate/latest-version.svg)](http://clojars.org/io.datopia/stickler-translate)
 
 ### [io.datopia/stickler-codec](codec)
 
 Runtime codec library.
 
 [![Clojars
-Project](http://clojars.org/io.datopia/sticker-codec/latest-version.svg)](http://clojars.org/io.datopia/stickler-codec)
+Project](http://clojars.org/io.datopia/stickler-codec/latest-version.svg)](http://clojars.org/io.datopia/stickler-codec)
 
 ## Contributors
 
