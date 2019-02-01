@@ -7,14 +7,17 @@
                        :url  "https://github.com/datopia/stickler"}
   :dependencies       [[org.clojure/clojure "1.10.0"]]
   :java-source-paths  ["src/java"]
-  :profiles           {:dev {:java-source-paths ["test/gen-java"]
-                             :global-vars       {*warn-on-reflection* true}
-                             :aliases
-                             {"test-prep" ["run" "-m" "stickler.test-prep"]}
-                             :plugins      [[lein-codox "0.10.5"]]
-                             :codox        {:namespaces [#"^stickler\."]
-                                            :metadata   {:doc/format :markdown}}
-                             :dependencies
-                             [[io.datopia/stickler-translate         "0.1.0"]
-                              [com.squareup.wire/wire-java-generator "2.3.0-RC1"]
-                              [org.clojure/test.check                "0.10.0-alpha3"]]}})
+  :profiles
+  {:dev {:java-source-paths ["test/gen-java"]
+         :global-vars       {*warn-on-reflection* true}
+         :aliases
+         {"test-prep" ["run" "-m" "stickler.test-prep"]}
+         :plugins      [[lein-codox "0.10.5"]]
+         :codox        {:namespaces [#"^stickler\."]
+                        :metadata   {:doc/format :markdown}
+                        :themes     [:default [:datopia {:datopia/github "https://github.com/datopia/stickler"}]]}
+         :dependencies
+         [[io.datopia/stickler-translate         "0.1.0"]
+          [io.datopia/codox-theme                "0.1.0"]
+          [com.squareup.wire/wire-java-generator "2.3.0-RC1"]
+          [org.clojure/test.check                "0.10.0-alpha3"]]}})
