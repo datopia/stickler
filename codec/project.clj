@@ -1,4 +1,4 @@
-(defproject io.datopia/stickler-codec "0.1.0"
+(defproject io.datopia/stickler-codec "0.1.1-SNAPSHOT"
   :description        "Idiomatic Clojure codec functionality for protobuf3."
   :url                "https://github.com/datopia/stickler"
   :license            {:name "MIT License"
