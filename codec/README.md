@@ -1,4 +1,4 @@
-# `io.datopia/sticker-codec`
+# io.datopia/stickler-codec
 
  [![Clojars
 Project](http://clojars.org/io.datopia/stickler-codec/latest-version.svg)](http://clojars.org/io.datopia/stickler-codec)

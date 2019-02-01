@@ -4,7 +4,7 @@ Clojure-idiomatic protobuf3 schema generation & codec functionality.
 
 ## Subprojects
 
-### [io.datopia/sticker-translate](translate)
+### [io.datopia/stickler-translate](translate)
 
 protobuf->edn schema generation library.
 

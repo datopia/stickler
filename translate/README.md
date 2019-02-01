@@ -1,4 +1,4 @@
-# `io.datopia/sticker-translate`
+# io.datopia/stickler-translate
 
  [![Clojars
 Project](http://clojars.org/io.datopia/stickler-translate/latest-version.svg)](http://clojars.org/io.datopia/stickler-translate)
