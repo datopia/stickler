@@ -9,7 +9,10 @@
                  [com.squareup.wire/wire-schema  "2.3.0-RC1"]]
   :main         stickler.translate
   :aot          [stickler.translate]
-  :profiles     {:dev {:global-vars {*warn-on-reflection* true}
-                       :plugins     [[lein-codox "0.10.5"]]
-                       :codox       {:namespaces [#"^stickler\."]
-                                     :metadata   {:doc/format :markdown}}}})
+  :profiles
+  {:dev {:global-vars  {*warn-on-reflection* true}
+         :dependencies [[io.datopia/codox-theme "0.1.0"]]
+         :plugins      [[lein-codox "0.10.5"]]
+         :codox        {:namespaces [#"^stickler\."]
+                        :metadata   {:doc/format :markdown}
+                        :themes     [:default [:datopia {:datopia/github "https://github.com/datopia/stickler"}]]}}})
