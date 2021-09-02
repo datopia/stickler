@@ -109,18 +109,15 @@
       ret)))
 
 (defn- convert-proto-file [^com.squareup.wire.schema.ProtoFile f]
-  (reduce
-   (fn reduce-top-levels [acc ^Type t]
-     (reduce
-      (partial apply assoc)
-      acc
-      (map
-       (fn reduce-top-level-and-nested [t]
-         [(proto+type->key f t)
-          (-convert-type   t f)])
-       (into [t] (.nestedTypes t)))))
-   {}
-   (.types f)))
+  (loop [types      (into '() (.types f))
+         name->type {}]
+    (if-let [^Type t (peek types)]
+      (recur
+       (into (pop types) (.nestedTypes t))
+       (assoc name->type
+         (proto+type->key f t)
+         (-convert-type   t f)))
+      name->type)))
 
 (defn- map->IdentifierSet [incl-excl]
   (as-> (IdentifierSet$Builder.) ^IdentifierSet$Builder b
