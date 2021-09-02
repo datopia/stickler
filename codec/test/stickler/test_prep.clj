@@ -2,11 +2,16 @@
   (:require [clojure.java.io    :as io]
             [stickler.translate :as stickler]
             [clojure.pprint     :as pprint])
-  (:import [com.squareup.wire.schema Schema SchemaLoader ProtoType]
-           [com.squareup.wire.java ProfileLoader JavaGenerator]
-           [com.squareup.javapoet JavaFile]
-           [java.nio.file Files]
-           [java.nio.file.attribute FileAttribute])
+  (:import [com.squareup.wire.schema
+            Schema]
+           [com.squareup.wire.java
+            ProfileLoader JavaGenerator]
+           [com.squareup.javapoet
+            JavaFile]
+           [java.nio.file
+            Files]
+           [java.nio.file.attribute
+            FileAttribute])
   (:gen-class))
 
 (defn- output-java [dir ^JavaGenerator gen t]
@@ -36,10 +41,11 @@
     (pprint/write (stickler/Schema->edn schema) :stream writer)))
 
 (defn -main [& [out-dir schema-out]]
-  {:pre [out-dir]}
-  (let [tmp-in  (.toFile (Files/createTempDirectory "proto" (make-array FileAttribute 0)))
-        proto-f (io/file tmp-in "test.proto")
-        in-res  (io/resource "test.proto")]
+  (let [out-dir    (or out-dir    "test/gen-java")
+        schema-out (or schema-out "test/resources")
+        tmp-in     (.toFile (Files/createTempDirectory "proto" (make-array FileAttribute 0)))
+        proto-f    (io/file tmp-in "test.proto")
+        in-res     (io/resource "test.proto")]
     (spit proto-f (slurp in-res))
     (let [schema (stickler/dirs->Schema tmp-in)]
       (generate-java schema (io/file out-dir))

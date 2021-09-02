@@ -4,7 +4,6 @@
              :refer [map->Scalars float= double= msg=]]
             [clojure.java.io :as io]
             [clojure.edn     :as edn]
-            [clojure.test.check :as tc]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [clojure.test.check.clojure-test
@@ -14,12 +13,12 @@
             Scalars$Builder
             ScalarContainer
             ScalarsRepeated
-            RepeatedScalarNoOptions
             RepeatedScalarPacked
             RepeatedScalarUnpacked
             RepeatedString
             OneOfInt]
-           [java.util Arrays]))
+           [java.util
+            Arrays]))
 
 (def ^:private trials 1000)
 
@@ -213,8 +212,8 @@
     (msg= (:value msg) (:value (roundtrip msg)))))
 
 ;; Per protobuf3, a repeated scalar with no options should default to packed
-;; encoding; we compare our encoding of `RepeatedScalarNoOptions` with
-;; Wire's encoding of `RepeatedScalarPacked`.
+;; encoding; we compare our encoding of `RepeatedScalarNoOptions` with Wire's
+;; encoding of `RepeatedScalarPacked`.
 
 (defspec repeated-scalar-wire-symmetry trials
   (wire-symmetry-prop

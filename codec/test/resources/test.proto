@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package stickler.test;
+
+message Scalars {
+  int32     int32    = 1;
+  int64     int64    = 2;
+  uint32    uint32   = 3;
+  uint64    uint64   = 4;
+  sint32    sint32   = 5;
+  sint64    sint64   = 6;
+  sfixed32  sfixed32 = 7;
+  sfixed64  sfixed64 = 8;
+  bytes     bytes    = 9;
+  string    string   = 10;
+  bool      bool     = 11;
+  double    double   = 12;
+  float     float    = 13;
+}
+
+message ScalarContainer {
+  Scalars value = 1;
+}
+
+message ScalarsRepeated {
+  repeated Scalars values = 1;
+}
+
+message RepeatedScalarPacked {
+  repeated int32 int32s = 1 [packed = true];
+}
+
+message RepeatedScalarUnpacked {
+  repeated int32 int32s = 1 [packed = false];
+}
+
+message RepeatedScalarNoOptions {
+  repeated int32 int32s = 1;
+}
+
+message RepeatedString {
+  repeated string strings = 1;
+}
+
+message OneOfInt {
+  oneof value {
+    int32 int32 = 1;
+    int64 int64 = 2;
+  }
+}
