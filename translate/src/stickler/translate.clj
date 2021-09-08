@@ -1,168 +1,162 @@
 (ns stickler.translate
   "Convert directories of-disk protobuf3 files into EDN schemas suitable for use
   by `io.datopia/sticker-codec`."
-  (:require [clojure.java.io         :as    io]
-            [stickler.translate.util :refer [assoc-when]]
-            [clojure.walk            :as    walk]
-            [clojure.string          :as    str]
-            [clojure.pprint          :refer [pprint]])
-  (:import [com.squareup.wire.schema
-            Schema SchemaLoader ProtoType OneOf IdentifierSet$Builder ProtoMember Type])
-  (:gen-class))
+  (:require [clojure.java.io :as io]
+            [clojure.walk    :as walk]
+            [clojure.pprint]
+            [clojure.string  :as str]
+            [clojure.edn     :as edn]
+            [clj-antlr.core  :as antlr]
+            [path.path       :as p]
+            [path.util       :as p.util]))
 
-(defn- un-underscore [s]
-  (str/replace (name s) #"_" "-"))
+(def ^:private grammar-name      "Protobuf3.g4")
+(def ^:private f-modifier?       #{"repeated"}) ;; grammar doesn't support "optional"
+(def ^:private predicate-options #{"packed"})
 
-(def ^:dynamic ->field-name    (comp keyword un-underscore))
-(def ^:dynamic ->type-name     identity)
+;; clj-antlr wants the filename to be identical to the grammar & and won't accept a URI
+(let [tmp-dir     (p.util/create-temp-dir "grammar")
+      tmp-grammar (p/resolve tmp-dir grammar-name)]
+  (p/spit tmp-grammar (slurp (io/resource grammar-name)))
+  (def ^:private parser (antlr/parser (str tmp-grammar))))
 
-(let [scalar-types #{ProtoType/BOOL     ProtoType/BYTES   ProtoType/DOUBLE
-                     ProtoType/FLOAT    ProtoType/FIXED32 ProtoType/FIXED64
-                     ProtoType/INT32    ProtoType/INT64   ProtoType/SFIXED32
-                     ProtoType/SFIXED64 ProtoType/SINT32  ProtoType/SINT64
-                     ProtoType/STRING   ProtoType/UINT32  ProtoType/UINT64}]
-  (def ^:private scalar-proto-type->key
-    (zipmap scalar-types (map (comp keyword str) scalar-types))))
+(let [package-k :packageStatement]
+  (defn- package-name [tree]
+    (first
+     (for [[k v] tree
+           :when (identical? k package-k)]
+       (apply str v)))))
 
-(def ^:private wire-type->type
-  {0 #{:int32   :int64    :uint32 :uint64 :sint32 :sint64 :bool :enum}
-   1 #{:fixed64 :sfixed64 :double}
-   2 #{:string  :bytes}
-   5 #{:fixed32 :sfixed32 :float}})
+(let [import-k :importStatement]
+  (defn- gather-imports [tree]
+    (reduce
+     (fn [acc [k v]]
+       (if (identical? k import-k)
+         (conj acc (p/get (edn/read-string v)))
+         acc))
+      #{} tree)))
 
-(def ^:private msg-wire-type 2)
+(defmulti ^:private handle-node first)
 
-(def ^:private type->wire-type
-  (into {}
-    (for [[k vs] wire-type->type
-          v  vs]
-      [v k])))
+(defn- ->predicate-k [s]
+  (keyword (str s "?")))
 
-(defn- proto->package-name [^com.squareup.wire.schema.ProtoFile proto]
-  (.packageName proto))
+(defn- field->options [field]
+  (when (seq? (last field))
+    (let [[_ & pairs] (last field)]
+      (into {}
+        (for [[k v] pairs
+              :when (predicate-options k)]
+          [(->predicate-k k) (edn/read-string v)])))))
 
-(defn- type->simple-name [t]
-  (-> t .type .simpleName))
+(defmethod handle-node :field [[_ & field]]
+  (let [[mods  [f-type f-name tag]] (split-with f-modifier? field)
+        opts   (field->options field)
+        f-type (if (seq? f-type)
+                 (keyword (str/join "." (remove #{"."} (butlast f-type))) (last f-type))
+                 (keyword f-type))]
+    {(keyword f-name) (merge {:type f-type
+                              :tag  (Integer/valueOf ^String tag)}
+                             (zipmap (map ->predicate-k mods) (repeat true))
+                             opts)}))
 
-(defn- proto+type->key [proto t]
-  (let [package   (proto->package-name proto)
-        t-name    (->type-name (type->simple-name t))
-        enclosing (.enclosingTypeOrPackage ^ProtoType (.type t))]
-    (if (= package enclosing)
-      (keyword package   t-name)
-      (keyword enclosing t-name))))
+(defmethod handle-node :enumField [[_ e-name e-tag]]
+  {(keyword e-name) (Integer/valueOf ^String e-tag)})
 
-(let [packed      (ProtoMember/get "google.protobuf.FieldOptions#packed")
-      unpackable? #{ProtoType/BYTES ProtoType/STRING}]
-  (defn- packed? [^com.squareup.wire.schema.Field f]
-    (let [t (.type f)]
-      (when (and (.isRepeated f)
-                 (.isScalar   t)
-                 (not (unpackable? t)))
-        (not= "false" (.get (.options f) packed))))))
+(defmethod handle-node :enumBody [[ _ & fields]]
+  (into {:stickler/enum? true} (map handle-node
+                                    (filter #(identical? :enumField (first %)) fields))))
 
-(defn- convert-field [proto ^com.squareup.wire.schema.Field f]
-  (let [m (assoc-when {:tag (.tag f)}
-            :repeated? (.isRepeated f)
-            :packed?   (packed? f))
-        t (.type f)]
-    [(->field-name (keyword (.name f)))
-     (cond
-       (.isScalar t) (let [type-k (scalar-proto-type->key t)]
-                       (assoc m
-                         :scalar?   true
-                         :type      type-k
-                         :wire-type (type->wire-type type-k)))
-       (.isMap    t) (throw (RuntimeException. "Maps not supported."))
-       :else         (assoc m
-                       :type      (proto+type->key proto f)
-                       :wire-type msg-wire-type))]))
+(defmethod handle-node :enumDef [[ _ e-name [& tail]]]
+  {(keyword e-name) (handle-node tail)})
 
-(defn- convert-msg [proto fields one-ofs]
-  (let [fields  (into {} (map (partial convert-field proto) fields))
-        one-ofs (for [^OneOf one-of one-ofs
-                      f      (.fields one-of)
-                      :let [one-of-k (keyword (.name one-of))]]
-                  (-> (convert-field proto f)
-                      (assoc-in [1 :one-of] one-of-k)))]
-    (assoc-when {}
-      :fields (not-empty (into fields one-ofs)))))
+(defmethod handle-node :oneof [[_ o-name & fields]]
+  {(keyword o-name) (into {:stickler/one-of? true}
+                      (map handle-node
+                           (walk/postwalk-replace {:oneofField :field} fields)))})
 
-(defn- ->constant-name [s]
-  (-> s clojure.string/upper-case (clojure.string/replace \_ \-)))
+(defmethod handle-node :messageDef [[_ msg-name args]]
+  {(keyword msg-name) (into {:stickler/msg? (keyword msg-name)}
+                        (when (not (identical? args :messageBody))
+                          (map handle-node (rest args))))})
 
-(defprotocol ConvertType
-  (-convert-type [t proto]))
+(defmethod handle-node :default [node]
+  nil)
 
-(extend-protocol ConvertType
-  com.squareup.wire.schema.MessageType
-  (-convert-type [msg proto]
-    (convert-msg proto (.fields msg) (.oneOfs msg)))
-  com.squareup.wire.schema.EnumType
-  (-convert-type [enum _]
-    (let [ret (reduce
-               (fn conv-enum [m ^com.squareup.wire.schema.EnumConstant c]
-                 (let [k (-> c .name ->constant-name keyword)]
-                   (assoc m k (.tag c))))
-               {:enum? true}
-               (.constants enum))]
-      ret)))
+(let [lift? #{:ident       :type_     :topLevelDef :messageElement :messageType
+              :messageName :fieldName :fieldOption :enumElement    :optionName
+              :fieldNumber :enumName  :fullIdent   :constant       :intLit
+              :strLit      :keywords  :oneofName}
+      tokens #{"{" "}" "[" "]" "=" ";" "\"" "message" "enum" "oneof" "package" "import"}]
+  (defn- parse-file [f]
+    (let [[_ & tree] (parser (p/slurp f))
+          tree       (walk/postwalk
+                      (fn parse-tree-walker [v]
+                        (if (seq? v)
+                          (let [v (remove tokens (cond-> v (lift? (first v)) rest))]
+                            (cond-> v (= 1 (count v)) first))
+                          v))
+                      tree)
+          schema     (into {} (filter map? (map handle-node tree)))
+          package    (package-name tree)]
+      {:schema  schema
+       :imports (gather-imports tree)
+       :package package})))
 
-(defn- convert-proto-file [^com.squareup.wire.schema.ProtoFile f]
-  (loop [types      (into '() (.types f))
-         name->type {}]
-    (if-let [^Type t (peek types)]
-      (recur
-       (into (pop types) (.nestedTypes t))
-       (assoc name->type
-         (proto+type->key f t)
-         (-convert-type   t f)))
-      name->type)))
+(defn- resolve-import [paths import importer]
+  (if (p/absolute? import)
+    (if (p/file? import)
+      import
+      (throw (ex-info (str "Non-existent absolute import" import) {:import   import
+                                                                   :importer importer})))
+    (let [candidate (p/resolve importer import)]
+      (if (p/file? candidate)
+        candidate
+        (let [candidate (p/resolve-sibling importer import)]
+          (if (p/file? candidate)
+            candidate
+            (if-let [path (->> paths (map #(p/resolve % import)) (filter p/file?) first)]
+              path
+              (throw (ex-info (str "Can't resolve import " import) {:import   import
+                                                                    :importer importer})))))))))
 
-(defn- map->IdentifierSet [incl-excl]
-  (as-> (IdentifierSet$Builder.) ^IdentifierSet$Builder b
-    (reduce #(.include ^IdentifierSet$Builder %1 %2) b (:include incl-excl))
-    (reduce #(.exclude ^IdentifierSet$Builder %1 %2) b (:exclude incl-excl))
-    (.build b)))
+(defn- merge-by-package [schema schema' package]
+  (update-in schema (map keyword (str/split package #"\.")) merge schema'))
 
-(defn prune-Schema
-  "Prune the given `schema` such that the sequences of keyword/string
-  identifiers in `prune-spec`'s `:include` and `:exclude` keys are
-  included/excluded, respectively."
-  [^Schema schema prune-spec]
-  (.prune schema (map->IdentifierSet prune-spec)))
+(defn- parse-all [{:keys [files paths ignore?]}]
+  (loop [schema         {}
+         [file & files] files]
+    (if-not file
+      schema
+      (let [{schema' :schema
+             imports :imports
+             package :package} (parse-file file)
+            new-imports        (for [import (remove ignore? imports)]
+                                 (resolve-import paths import file))]
+        (recur (merge-by-package schema schema' package)
+               (into files new-imports))))))
 
-(defn rename-packages
-  "Using the given `str` -> `str` `renames` map, translate `edn-schema` into a
-  map with adjusted package names."
-  [edn-schema renames]
-  (walk/prewalk
-   (fn [form]
-     (if (keyword? form)
-       (if-let [ns (namespace form)]
-         (keyword (renames ns ns) (name form))
-         form)
-       form))
-   edn-schema))
+(def ^:private proto-xform
+  (mapcat
+   (fn [d]
+     (filter
+      #(str/ends-with? (p/name %) ".proto")
+      (p/path-seq d)))))
 
-(defn Schema->edn
-  "Convert the given `schema` to a map suitable for use by `stickler-codec`."
-  [^Schema schema]
-  (apply merge (map convert-proto-file (.protoFiles schema))))
+(defn- ->ignore-fn [strs]
+  (apply some-fn (map (fn [s]
+                        #(str/includes? (str %) s)) strs)))
 
-(defn- dirs->loader [& dirs]
-  (reduce
-   (fn [^SchemaLoader loader dir]
-     (doto loader
-       (.addSource (io/file dir))))
-   (SchemaLoader.)
-   dirs))
-
-(defn dirs->Schema
-  "Turn a sequence of `dirs` into a `Schema`.
-   See [[prune-Schema]], [[Schema->edn]]."
-  [& dirs]
-  (.load ^SchemaLoader (apply dirs->loader dirs)))
-
-(defn -main [& argv]
-  (pprint (Schema->edn (apply dirs->Schema argv))))
+(defn translate [{:keys [dirs files paths ignores]}]
+  (let [files     (into #{} (map p/get) files)
+        ignore-fn (if ignores
+                    (->ignore-fn ignores)
+                    (constantly false))]
+    (doseq [p files]
+      (when-not (p/exists? p)
+        (throw (ex-info (str "File " (str p) " doesn't exist") {:path p})))
+      (when-not (p/file? p)
+        (throw (ex-info (str (str p) " is not a file.") {:path p}))))
+    (parse-all {:files   (remove ignore-fn (into files proto-xform dirs))
+                :paths   (->> (map p/get paths) (concat (map p/get dirs)) (into #{}))
+                :ignore? ignore-fn})))

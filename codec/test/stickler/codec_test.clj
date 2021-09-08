@@ -8,17 +8,17 @@
             [clojure.test.check.properties :as prop]
             [clojure.test.check.clojure-test
              :refer [defspec]])
-  (:import [stickler.test
-            Scalars
-            Scalars$Builder
-            ScalarContainer
-            ScalarsRepeated
-            RepeatedScalarPacked
-            RepeatedScalarUnpacked
-            RepeatedString
-            OneOfInt]
-           [java.util
-            Arrays]))
+  (:import  [stickler.test
+             Scalars
+             Scalars$Builder
+             ScalarContainer
+             ScalarsRepeated
+             RepeatedScalarPacked
+             RepeatedScalarUnpacked
+             RepeatedString
+             OneOfInt]
+            [java.util
+             Arrays]))
 
 (def ^:private trials 1000)
 
@@ -151,19 +151,19 @@
 (defspec sfixed64-roundtrip trials
   (scalar-roundtrip-prop sfixed32))
 
-(defspec bool-symmetry trials
+(defspec bool-wire-symmetry trials
   (scalar-wire-symmetry-prop bool))
 
 (defspec bool-roundtrip trials
   (scalar-roundtrip-prop bool))
 
-(defspec string-symmetry trials
+(defspec string-wire-symmetry trials
   (scalar-wire-symmetry-prop string))
 
 (defspec string-roundtrip trials
   (scalar-roundtrip-prop string))
 
-(defspec double-symmetry trials
+(defspec double-wire-symmetry trials
   (scalar-wire-symmetry-prop double double_))
 
 (defspec double-roundtrip trials
@@ -171,7 +171,7 @@
                               :double       gen/double})]
     (double= (:double m) (:double (roundtrip m)))))
 
-(defspec float-symmetry trials
+(defspec float-wire-symmetry trials
   (scalar-wire-symmetry-prop float float_))
 
 (defspec float-roundtrip trials

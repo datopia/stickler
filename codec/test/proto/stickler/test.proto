@@ -2,21 +2,23 @@ syntax = "proto3";
 
 package stickler.test;
 
+import "chicken/eggs.proto";
+
 message Scalars {
-  int32     int32        = 1;
-  int64     int64        = 2;
-  uint32    uint32       = 3;
-  uint64    uint64       = 4;
-  sint32    sint32       = 5;
-  sint64    sint64       = 6;
-  sfixed32  sfixed32     = 7;
-  sfixed64  sfixed64     = 8;
-  bytes     bytes        = 9;
-  string    string       = 10;
-  bool      bool         = 11;
-  double    double       = 12;
-  float     float        = 13;
-  Size      size         = 14;
+  repeated int32     int32    = 1 [packed = false];
+  int64     int64    = 2;
+  uint32    uint32   = 3;
+  uint64    uint64   = 4;
+  sint32    sint32   = 5;
+  sint64    sint64   = 6;
+  sfixed32  sfixed32 = 7;
+  sfixed64  sfixed64 = 8;
+  bytes     bytes    = 9;
+  string    string   = 10;
+  bool      bool     = 11;
+  double    double   = 12;
+  float     float    = 13;
+  Size      size     = 14;
 
   enum Size {
     SMALL  = 0;
@@ -56,16 +58,14 @@ message OneOfInt {
   }
 }
 
+message Imported {
+  chicken.eggs.Egg egg = 1;
+}
+
 message Nested {
-  Egg egg = 1;
+  Inner inner = 1;
 
-  message Egg {
-    Size size = 1;
-
-    enum Size {
-      SMALL = 0;
-      MED   = 1;
-      LARGE = 2;
-    }
+  message Inner {
+    bool inner = 1;
   }
 }

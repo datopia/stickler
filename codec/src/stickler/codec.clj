@@ -1,15 +1,40 @@
 (ns stickler.codec
   (:require [clojure.java.io :as io]
-            [clojure.edn     :as edn])
+            [clojure.edn     :as edn]
+            [clojure.walk    :as walk]
+            [clojure.string :as str]
+            [stickler.translate :as stickler])
   (:import [java.io ByteArrayOutputStream ByteArrayInputStream]
            [java.nio.charset Charset]
            [org.datopia.stickler CodecUtil]))
 
 (def ^:private tag-type-bits      3)
 (def ^:private repeated-wire-type 2)
+(def ^:private embedded-msg-type  2)
+
+(let [explode (fn explode [m]
+                (reduce-kv
+                 (fn [acc ks v]
+                   (into acc (for [k ks]
+                               [k v])))
+                 {} m))]
+    (def ^:private type->wire-type
+      (explode
+       {#{:int32 :int64 :uint32 :uint64 :sint32 :sint64 :bool :enum} 0
+        #{:fixed64 :sfixed64 :double}                                1
+        #{:string :bytes}                                            2
+        #{:fixed32 :sfixed32 :float}                                 5})))
+
+(def ^:private explode-k
+  (memoize
+   (fn [k]
+     (map keyword (conj (str/split (namespace k) #"\.") (name k))))))
+
+(defn fetch [schema k]
+  (get-in schema (explode-k k)))
 
 (defn- verify-schema [schema t]
-  (let [t-schema (t schema)]
+  (let [t-schema (fetch schema t)]
     (assert t-schema (str "Unknown message: " t))
     t-schema))
 
@@ -85,11 +110,11 @@
       (.writeTo sub-stream stream))))
 
 (defn- encode-field [schema stream field v]
-  (if (:repeated? field)
+  (if (:stickler/repeated? field)
     (if (:packed? field)
       (encode-packed-field schema stream field v)
       (doseq [item v]
-        (encode-field schema stream (dissoc field :repeated?) item)))
+        (encode-field schema stream (dissoc field :stickler/repeated?) item)))
     (do
       (CodecUtil/writeVarint32 stream (field->tag field))
       (encode-field-value schema stream field v))))
@@ -136,30 +161,31 @@
             (recur (conj vs v))))))))
 
 (defn- decode-field [schema ^ByteArrayInputStream stream field]
-  (if (:repeated? field)
+  (if (:stickler/repeated? field)
     (if (:packed? field)
       (decode-packed-field schema stream field)
-      (recur schema stream (dissoc field :repeated?)))
+      (recur schema stream (dissoc field :stickler/repeated?)))
     (decode-field-value schema stream field)))
 
 (defn encode-stream [schema stream msg]
-  (let [t-schema (verify-encode schema msg)
-        fields   (:fields t-schema)]
+  (let [t-schema (verify-encode schema msg)]
     (reduce-kv
      (fn [one-ofs k field]
-       (if-some [v (k msg)]
-         (if-let [one-of (:one-of field)]
-           (if (one-of one-ofs)
-             one-ofs
+       (if (identical? (namespace k) :stickler)
+         one-ofs
+         (if-some [v (msg k)]
+           (if-let [one-of (and (:stickler/one-of? field) field)]
+             (if (one-ofs one-of)
+               one-ofs
+               (do
+                 (encode-field schema stream field v)
+                 (conj one-ofs one-of)))
              (do
                (encode-field schema stream field v)
-               (conj one-ofs one-of)))
-           (do
-             (encode-field schema stream field v)
-             one-ofs))
-         one-ofs))
+               one-ofs))
+           one-ofs)))
      #{}
-     fields)))
+     t-schema)))
 
 (defn encode-bytes [schema msg]
   (let [baos (ByteArrayOutputStream.)]
@@ -179,7 +205,7 @@
       (if-let [field (stream->field t-schema stream)]
         (let [v        (decode-field schema stream field)
               one-of   (:one-of field)
-              m        (if (and (:repeated? field) (not (:packed? field)))
+              m        (if (and (:stickler/repeated? field) (not (:packed? field)))
                          (update m (:name field) (fnil conj []) v)
                          (assoc  m (:name field)                v))]
           (recur (cond->> m (:one-of field) (decoded-one-of field))))
@@ -195,15 +221,28 @@
      (fn [a b]
        (let [t-a (-> fields a :tag)
              t-b (-> fields b :tag)]
-         (compare t-a t-b))))
+         (if (or (keyword? t-a) (keyword? t-b))
+           -1
+           (compare t-a t-b)))))
     fields))
 
-(defn prepare-schema [schema]
-  (into {}
-    (for [[msg-k msg-schema] schema
-          :let [msg-schema (update msg-schema :fields sorted-map-by-tag)
-                tag->f
-                (into {}
-                  (for [[field-k {tag :tag :as field}] (:fields msg-schema)]
-                    [tag (assoc field :name field-k)]))]]
-      [msg-k (assoc msg-schema :tag->field tag->f)])))
+(let [msg? (every-pred map? (some-fn :stickler/msg? :stickler/enum?))]
+  (defn prepare-schema [schema]
+    (walk/postwalk
+     (fn [m]
+       (cond (msg? m)
+             (let [t->f (into {}
+                          (for [[k v] m :when (map? v)]
+                            [(:tag v) (assoc v :name k)]))
+                   m    (into {}
+                          (for [[k v] m :when (map? v)]
+                            {k (assoc v :name k)}))]
+               (-> m
+                   (assoc :tag->field t->f)
+                   sorted-map-by-tag))
+             (:type m)
+             (if-let [wt (type->wire-type (:type m))]
+               (assoc m :wire-type wt)
+               m)
+             :else m))
+     schema)))

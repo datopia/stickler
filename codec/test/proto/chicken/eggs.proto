@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package chicken.eggs;
+
+message Egg {
+  Size size = 1;
+
+  enum Size {
+    S = 0;
+    M = 1;
+    L = 2;
+  }
+}
