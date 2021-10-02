@@ -14,19 +14,11 @@
 (defn ^{:no-project-needed true} stickler
   "protobuf3 -> EDN schema, for use with stickler.codec.
 
-   :dirs ~/proto ...
-      A sequence of directories to process into a protobuf schema.
-
-   :include A.B ...
-     Prune the output by including only these types & their transient deps.
-
-   :exclude B.C ...
-     Prune the output by excluding these types.
-
+   :dirs /proto ...
+      A sequence of absolute directories to process into a protobuf schema.
    The EDN is pretty-printed to stdout"
   [_ & args]
   (let [args (parse-args args)]
     (-> (apply translate/dirs->Schema (:dirs args))
-        (translate/prune-Schema args)
         translate/Schema->edn
         pprint/pprint)))

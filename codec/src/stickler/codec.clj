@@ -198,12 +198,29 @@
          (compare t-a t-b))))
     fields))
 
+(defn- prepare-enums [schema]
+  (reduce
+   (fn [[msgs enums] [k msg]]
+     (if (:enum? msg)
+       [msgs (assoc enums k
+               (assoc msg :tag->kw (into {}
+                                     (for [[k v] (:fields msg)]
+                                       [v k]))))]
+       [(assoc msgs k msg) enums]))
+   [{} {}]
+   schema))
+
+(defn- prepare-messages [schema]
+  (for [[msg-k msg-schema] schema
+             :let [msg-schema (update msg-schema :fields sorted-map-by-tag)
+                   tag->f
+                   (into {}
+                     (for [[field-k {tag :tag :as field}] (:fields msg-schema)]
+                       [tag (assoc field :name field-k)]))]]
+    [msg-k (assoc msg-schema :tag->field tag->f)]))
+
 (defn prepare-schema [schema]
-  (into {}
-    (for [[msg-k msg-schema] schema
-          :let [msg-schema (update msg-schema :fields sorted-map-by-tag)
-                tag->f
-                (into {}
-                  (for [[field-k {tag :tag :as field}] (:fields msg-schema)]
-                    [tag (assoc field :name field-k)]))]]
-      [msg-k (assoc msg-schema :tag->field tag->f)])))
+  (let [[schema enums] (prepare-enums schema)]
+    (reduce into {}
+      [enums
+       (prepare-messages schema)])))

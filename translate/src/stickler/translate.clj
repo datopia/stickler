@@ -129,7 +129,7 @@
     (.build b)))
 
 (defn prune-Schema
-  "Prune the given `schema` such that the sequences of keyword/string
+  "Prune the given `schema` such that the sequences of string
   identifiers in `prune-spec`'s `:include` and `:exclude` keys are
   included/excluded, respectively."
   [^Schema schema prune-spec]
@@ -149,9 +149,7 @@
    edn-schema))
 
 (defn- unfuck-enums [schema]
-  (let [enums (into #{} (for [[k v] schema
-                              :when (:enum? v)]
-                          k))]
+  (let [enums (into #{} (for [[k v] schema :when (:enum? v)] k))]
     (walk/postwalk
      (fn [form]
        (if (and (map? form) (enums (:type form)))
@@ -178,7 +176,7 @@
 
 (defn dirs->Schema
   "Turn a sequence of `dirs` into a `Schema`.
-   See [[prune-Schema]], [[Schema->edn]]."
+  See [[prune-Schema]], [[Schema->edn]]."
   [& dirs]
   (.load ^SchemaLoader (apply dirs->loader dirs)))
 

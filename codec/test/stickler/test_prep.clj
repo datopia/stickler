@@ -35,12 +35,11 @@
   (with-open [writer (io/writer (io/file out-dir "schema.edn"))]
     (pprint/write (stickler/Schema->edn schema) :stream writer)))
 
-(defn -main [& [out-dir schema-out]]
-  {:pre [out-dir]}
+(defn -main []
   (let [tmp-in  (.toFile (Files/createTempDirectory "proto" (make-array FileAttribute 0)))
         proto-f (io/file tmp-in "test.proto")
         in-res  (io/resource "test.proto")]
     (spit proto-f (slurp in-res))
     (let [schema (stickler/dirs->Schema tmp-in)]
-      (generate-java schema (io/file out-dir))
-      (generate-edn  schema (io/file schema-out)))))
+      (generate-java schema (io/file "test/gen-java"))
+      (generate-edn  schema (io/file "test/resources/")))))
