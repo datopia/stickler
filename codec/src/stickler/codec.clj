@@ -47,6 +47,12 @@
 
 (declare encode-stream)
 
+(defn- encode-enum-field-value [schema ^ByteArrayInputStream stream field v]
+  [{:pre [(keyword? v)]}]
+  (let [t (:type field)
+        m (-> schema t :fields)]
+    (CodecUtil/writeVarint32 stream (unchecked-int (m v)))))
+
 (defn- encode-message-field-value [schema stream v]
   (let [sub-stream (ByteArrayOutputStream.)]
     (encode-stream schema sub-stream v)
@@ -72,7 +78,9 @@
     :double   (CodecUtil/writeDouble     stream (unchecked-double v))
     :bytes    (encode-byte-array stream v)
     :string   (encode-byte-array stream (.getBytes ^String v ^Charset utf8))
-    (encode-message-field-value schema stream v)))
+    (if (:enum? ((:type field) schema))
+      (encode-enum-field-value schema stream field v)
+      (encode-message-field-value schema stream v))))
 
 (defn- encode-packed-field [schema stream field v]
   (when-not (empty? v)
@@ -103,6 +111,12 @@
     (.read stream body 0 len)
     (decode-bytes schema (:type field) body)))
 
+(defn- decode-enum-field-value [schema ^ByteArrayInputStream stream field]
+  (let [x (CodecUtil/readVarint32 stream)
+        t (:type field)
+        m (-> schema t :tag->kw)]
+    (m x)))
+
 (defn- decode-field-value [schema ^ByteArrayInputStream stream field & [len]]
   (case (:type field)
     :uint32   (CodecUtil/readUnsigned32 stream)
@@ -122,7 +136,10 @@
     :double   (CodecUtil/readDouble     stream)
     :bytes    (decode-byte-array stream len)
     :string   (String. ^bytes (decode-byte-array stream len) ^Charset utf8)
-    (decode-message-field-value schema stream field)))
+
+    (if (:enum? ((:type field) schema))
+      (decode-enum-field-value   schema stream field)
+      (decode-message-field-value schema stream field))))
 
 (defn- decode-packed-field [schema ^ByteArrayInputStream stream field]
   (let [size (CodecUtil/readVarint32 stream)

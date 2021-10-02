@@ -100,13 +100,12 @@
     (convert-msg proto (.fields msg) (.oneOfs msg)))
   com.squareup.wire.schema.EnumType
   (-convert-type [enum _]
-    (let [ret (reduce
-               (fn conv-enum [m ^com.squareup.wire.schema.EnumConstant c]
-                 (let [k (-> c .name ->constant-name keyword)]
-                   (assoc-in m [:fields k] (.tag c))))
-               {:enum? true}
-               (.constants enum))]
-      ret)))
+    (reduce
+     (fn conv-enum [m ^com.squareup.wire.schema.EnumConstant c]
+       (let [k (-> c .name ->constant-name keyword)]
+         (assoc-in m [:fields k] (.tag c))))
+     {:enum? true}
+     (.constants enum))))
 
 (defn- convert-proto-file [^com.squareup.wire.schema.ProtoFile f]
   (reduce

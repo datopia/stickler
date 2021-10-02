@@ -43,7 +43,8 @@
    :bool         gen/boolean
    :double       gen/double
    :float        gen-float
-   :stickler/msg (gen/return :stickler.test/Scalars)})
+   :stickler/msg (gen/return :stickler.test/Scalars)
+   :size         (gen/elements #{:SMALL :MEDIUM :LARGE})})
 
 (defn- map->gen [m]
   (let [m-gen (apply gen/tuple
@@ -192,6 +193,18 @@
                               :bytes        gen/bytes})]
     (Arrays/equals ^bytes (:bytes m)
                    ^bytes (:bytes (roundtrip m)))))
+
+(defspec enum-wire-symmetry trials
+  (wire-symmetry-prop
+   Scalars
+   {:stickler/msg :stickler.test/Scalars
+    :size         (gen/elements #{:SMALL :MEDIUM :LARGE})}
+   map->Scalars))
+
+(defspec enum-roundtrip trials
+  (prop/for-all [m (map->gen {:stickler/msg :stickler.test/Scalars
+                              :size         (gen/elements #{:SMALL :MEDIUM :LARGE})})]
+    (= (:size m) (:size (roundtrip m)))))
 
 (defspec message-wire-symmetry trials
   (wire-symmetry-prop Scalars gen-message map->Scalars))
