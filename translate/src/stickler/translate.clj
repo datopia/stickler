@@ -1,6 +1,6 @@
 (ns stickler.translate
   "Convert directories of-disk protobuf3 files into EDN schemas suitable for use
-  by `io.datopia/sticker-codec`."
+  by `org.datopia/sticker-codec`."
   (:require [clojure.java.io         :as    io]
             [stickler.translate.util :refer [assoc-when]]
             [clojure.walk            :as    walk]
