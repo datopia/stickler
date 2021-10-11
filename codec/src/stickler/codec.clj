@@ -1,6 +1,4 @@
 (ns stickler.codec
-  (:require [clojure.java.io :as io]
-            [clojure.edn     :as edn])
   (:import [java.io ByteArrayOutputStream ByteArrayInputStream]
            [java.nio.charset Charset]
            [io.datopia.stickler CodecUtil]))
@@ -48,7 +46,7 @@
 (declare encode-stream)
 
 (defn- encode-enum-field-value [schema ^ByteArrayInputStream stream field v]
-  [{:pre [(keyword? v)]}]
+  {:pre [(keyword? v)]}
   (let [t (:type field)
         m (-> schema t :fields)]
     (CodecUtil/writeVarint32 stream (unchecked-int (m v)))))
@@ -229,15 +227,15 @@
 
 (defn- prepare-messages [schema]
   (for [[msg-k msg-schema] schema
-             :let [msg-schema (update msg-schema :fields sorted-map-by-tag)
-                   tag->f
-                   (into {}
-                     (for [[field-k {tag :tag :as field}] (:fields msg-schema)]
-                       [tag (assoc field :name field-k)]))]]
+        :let [msg-schema (update msg-schema :fields sorted-map-by-tag)
+              tag->f
+              (into {}
+                (for [[field-k {tag :tag :as field}] (:fields msg-schema)]
+                  [tag (assoc field :name field-k)]))]]
     [msg-k (assoc msg-schema :tag->field tag->f)]))
 
 (defn prepare-schema [schema]
   (let [[schema enums] (prepare-enums schema)]
     (reduce into {}
-      [enums
-       (prepare-messages schema)])))
+            [enums
+             (prepare-messages schema)])))
