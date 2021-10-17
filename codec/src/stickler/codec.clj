@@ -1,6 +1,4 @@
 (ns stickler.codec
-  (:require [clojure.java.io :as io]
-            [clojure.edn     :as edn])
   (:import [java.io ByteArrayOutputStream ByteArrayInputStream]
            [java.nio.charset Charset]
            [io.datopia.stickler CodecUtil]))
@@ -47,6 +45,12 @@
 
 (declare encode-stream)
 
+(defn- encode-enum-field-value [schema ^ByteArrayInputStream stream field v]
+  {:pre [(keyword? v)]}
+  (let [t (:type field)
+        m (-> schema t :fields)]
+    (CodecUtil/writeVarint32 stream (unchecked-int (m v)))))
+
 (defn- encode-message-field-value [schema stream v]
   (let [sub-stream (ByteArrayOutputStream.)]
     (encode-stream schema sub-stream v)
@@ -72,7 +76,9 @@
     :double   (CodecUtil/writeDouble     stream (unchecked-double v))
     :bytes    (encode-byte-array stream v)
     :string   (encode-byte-array stream (.getBytes ^String v ^Charset utf8))
-    (encode-message-field-value schema stream v)))
+    (if (:enum? ((:type field) schema))
+      (encode-enum-field-value schema stream field v)
+      (encode-message-field-value schema stream v))))
 
 (defn- encode-packed-field [schema stream field v]
   (when-not (empty? v)
@@ -103,6 +109,12 @@
     (.read stream body 0 len)
     (decode-bytes schema (:type field) body)))
 
+(defn- decode-enum-field-value [schema ^ByteArrayInputStream stream field]
+  (let [x (CodecUtil/readVarint32 stream)
+        t (:type field)
+        m (-> schema t :tag->kw)]
+    (m x)))
+
 (defn- decode-field-value [schema ^ByteArrayInputStream stream field & [len]]
   (case (:type field)
     :uint32   (CodecUtil/readUnsigned32 stream)
@@ -122,7 +134,10 @@
     :double   (CodecUtil/readDouble     stream)
     :bytes    (decode-byte-array stream len)
     :string   (String. ^bytes (decode-byte-array stream len) ^Charset utf8)
-    (decode-message-field-value schema stream field)))
+
+    (if (:enum? ((:type field) schema))
+      (decode-enum-field-value   schema stream field)
+      (decode-message-field-value schema stream field))))
 
 (defn- decode-packed-field [schema ^ByteArrayInputStream stream field]
   (let [size (CodecUtil/readVarint32 stream)
@@ -198,12 +213,29 @@
          (compare t-a t-b))))
     fields))
 
+(defn- prepare-enums [schema]
+  (reduce
+   (fn [[msgs enums] [k msg]]
+     (if (:enum? msg)
+       [msgs (assoc enums k
+               (assoc msg :tag->kw (into {}
+                                     (for [[k v] (:fields msg)]
+                                       [v k]))))]
+       [(assoc msgs k msg) enums]))
+   [{} {}]
+   schema))
+
+(defn- prepare-messages [schema]
+  (for [[msg-k msg-schema] schema
+        :let [msg-schema (update msg-schema :fields sorted-map-by-tag)
+              tag->f
+              (into {}
+                (for [[field-k {tag :tag :as field}] (:fields msg-schema)]
+                  [tag (assoc field :name field-k)]))]]
+    [msg-k (assoc msg-schema :tag->field tag->f)]))
+
 (defn prepare-schema [schema]
-  (into {}
-    (for [[msg-k msg-schema] schema
-          :let [msg-schema (update msg-schema :fields sorted-map-by-tag)
-                tag->f
-                (into {}
-                  (for [[field-k {tag :tag :as field}] (:fields msg-schema)]
-                    [tag (assoc field :name field-k)]))]]
-      [msg-k (assoc msg-schema :tag->field tag->f)])))
+  (let [[schema enums] (prepare-enums schema)]
+    (reduce into {}
+            [enums
+             (prepare-messages schema)])))

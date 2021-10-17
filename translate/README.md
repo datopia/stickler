@@ -1,9 +1,9 @@
 # io.datopia/stickler-translate
 
  [![Clojars
-Project](http://clojars.org/io.datopia/stickler-translate/latest-version.svg)](http://clojars.org/io.datopia/stickler-translate)
+Project](http://clojars.org/org.datopia/stickler-translate/latest-version.svg)](http://clojars.org/org.datopia/stickler-translate)
 
-Conversion of on-disk protobuf3 files into EDN schemas, suitable as inputs for [io.datopia/stickler-codec](../codec).
+Conversion of on-disk protobuf3 files into EDN schemas, suitable as inputs for [org.datopia/stickler-codec](../codec).
 
 ## Documentation
  - [API Docs](https://datopia.github.io/stickler/stickler-translate/)

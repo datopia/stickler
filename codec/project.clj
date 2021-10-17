@@ -1,4 +1,4 @@
-(defproject io.datopia/stickler-codec "0.1.1-SNAPSHOT"
+(defproject org.datopia/stickler-codec "0.1.1-SNAPSHOT"
   :description        "Idiomatic Clojure codec functionality for protobuf3."
   :url                "https://github.com/datopia/stickler"
   :license            {:name "MIT License"
@@ -9,6 +9,7 @@
   :java-source-paths  ["src/java"]
   :profiles
   {:dev {:java-source-paths ["test/gen-java"]
+         :resource-paths    ["test/resources"]
          :global-vars       {*warn-on-reflection* true}
          :aliases
          {"test-prep" ["run" "-m" "stickler.test-prep"]}
@@ -17,7 +18,7 @@
                         :metadata   {:doc/format :markdown}
                         :themes     [:default [:datopia {:datopia/github "https://github.com/datopia/stickler"}]]}
          :dependencies
-         [[io.datopia/stickler-translate         "0.1.0"]
+         [[org.datopia/stickler-translate        "0.1.1-SNAPSHOT"]
           [io.datopia/codox-theme                "0.1.0"]
           [com.squareup.wire/wire-java-generator "2.3.0-RC1"]
           [org.clojure/test.check                "0.10.0-alpha3"]]}})

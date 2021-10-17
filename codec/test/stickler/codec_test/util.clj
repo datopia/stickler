@@ -1,5 +1,7 @@
 (ns stickler.codec-test.util
-  (:import [stickler.test Scalars$Builder]
+  (:import [stickler.test
+            Scalars$Builder
+            Scalars$Size]
            [java.util Arrays]))
 
 ;; taken from encore
@@ -30,6 +32,8 @@
     (:string   m) (.string   (:string m))
     (:float    m) (.float_   (:float  m))
     (:double   m) (.double_  (:double m))
+
+    (:size     m) (.size     (Scalars$Size/valueOf (name (:size m))))
 
     (contains? m :bool) (.bool (:bool m))))
 

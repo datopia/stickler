@@ -1,13 +1,13 @@
 (ns stickler.translate
   "Convert directories of-disk protobuf3 files into EDN schemas suitable for use
-  by `io.datopia/sticker-codec`."
+  by `org.datopia/sticker-codec`."
   (:require [clojure.java.io         :as    io]
             [stickler.translate.util :refer [assoc-when]]
             [clojure.walk            :as    walk]
             [clojure.string          :as    str]
             [clojure.pprint          :refer [pprint]])
   (:import [com.squareup.wire.schema
-            Schema SchemaLoader ProtoType OneOf IdentifierSet$Builder ProtoMember])
+            Schema SchemaLoader ProtoType OneOf IdentifierSet$Builder ProtoMember Type])
   (:gen-class))
 
 (defn- un-underscore [s]
@@ -41,7 +41,7 @@
 (defn- proto->package-name [^com.squareup.wire.schema.ProtoFile proto]
   (.packageName proto))
 
-(defn- type->simple-name [ t]
+(defn- type->simple-name [t]
   (-> t .type .simpleName))
 
 (defn- proto+type->key [proto t]
@@ -69,8 +69,6 @@
     [(->field-name (keyword (.name f)))
      (cond
        (.isScalar t) (let [type-k (scalar-proto-type->key t)]
-                       (when (= type-k :enum)
-                         (throw (RuntimeException. "Enums not supported.")))
                        (assoc m
                          :scalar?   true
                          :type      type-k
@@ -80,25 +78,46 @@
                        :type      (proto+type->key proto f)
                        :wire-type msg-wire-type))]))
 
-(defn- convert-one-of [proto ^OneOf one-of]
-  (let [fields (mapv (partial convert-field proto) (.fields one-of))]
-    {(->field-name (keyword (.name one-of))) {:one-of (into {} fields)}}))
-
-(defn- convert-fields [proto fields one-ofs]
+(defn- convert-msg [proto fields one-ofs]
   (let [fields  (into {} (map (partial convert-field proto) fields))
         one-ofs (for [^OneOf one-of one-ofs
-                             f      (.fields one-of)
+                      f      (.fields one-of)
                       :let [one-of-k (keyword (.name one-of))]]
                   (-> (convert-field proto f)
                       (assoc-in [1 :one-of] one-of-k)))]
     (assoc-when {}
-      :fields  (not-empty (into fields one-ofs)))))
+      :fields (not-empty (into fields one-ofs)))))
+
+(defn- ->constant-name [s]
+  (-> s clojure.string/upper-case (clojure.string/replace \_ \-)))
+
+(defprotocol ConvertType
+  (-convert-type [t proto]))
+
+(extend-protocol ConvertType
+  com.squareup.wire.schema.MessageType
+  (-convert-type [msg proto]
+    (convert-msg proto (.fields msg) (.oneOfs msg)))
+  com.squareup.wire.schema.EnumType
+  (-convert-type [enum _]
+    (reduce
+     (fn conv-enum [m ^com.squareup.wire.schema.EnumConstant c]
+       (let [k (-> c .name ->constant-name keyword)]
+         (assoc-in m [:fields k] (.tag c))))
+     {:enum? true}
+     (.constants enum))))
 
 (defn- convert-proto-file [^com.squareup.wire.schema.ProtoFile f]
   (reduce
-   (fn [acc ^com.squareup.wire.schema.MessageType t]
-     (let [t-name (proto+type->key f t)]
-       (assoc acc t-name (convert-fields f (.fields t) (.oneOfs t)))))
+   (fn reduce-top-levels [acc ^Type t]
+     (reduce
+      (partial apply assoc)
+      acc
+      (map
+       (fn reduce-top-level-and-nested [t]
+         [(proto+type->key f t)
+          (-convert-type   t f)])
+       (into [t] (.nestedTypes t)))))
    {}
    (.types f)))
 
@@ -109,7 +128,7 @@
     (.build b)))
 
 (defn prune-Schema
-  "Prune the given `schema` such that the sequences of keyword/string
+  "Prune the given `schema` such that the sequences of string
   identifiers in `prune-spec`'s `:include` and `:exclude` keys are
   included/excluded, respectively."
   [^Schema schema prune-spec]
@@ -128,10 +147,23 @@
        form))
    edn-schema))
 
+(defn- unfuck-enums [schema]
+  (let [enums (into #{} (for [[k v] schema :when (:enum? v)] k))]
+    (walk/postwalk
+     (fn [form]
+       (if (and (map? form) (enums (:type form)))
+         (assoc form :wire-type (type->wire-type :enum))
+         form))
+     schema)))
+
 (defn Schema->edn
   "Convert the given `schema` to a map suitable for use by `stickler-codec`."
   [^Schema schema]
-  (apply merge (map convert-proto-file (.protoFiles schema))))
+  (->> schema
+       .protoFiles
+       (map convert-proto-file)
+       (apply merge)
+       unfuck-enums))
 
 (defn- dirs->loader [& dirs]
   (reduce
@@ -143,9 +175,12 @@
 
 (defn dirs->Schema
   "Turn a sequence of `dirs` into a `Schema`.
-   See [[prune-Schema]], [[Schema->edn]]."
+  See [[prune-Schema]], [[Schema->edn]]."
   [& dirs]
   (.load ^SchemaLoader (apply dirs->loader dirs)))
 
-(defn -main [& argv]
-  (pprint (Schema->edn (apply dirs->Schema argv))))
+(defn translate [& argv]
+  (Schema->edn (apply dirs->Schema argv)))
+
+(defn -main [& args]
+  (pprint (apply translate args)))
