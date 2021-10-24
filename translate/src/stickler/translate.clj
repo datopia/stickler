@@ -121,19 +121,6 @@
    {}
    (.types f)))
 
-(defn rename-packages
-  "Using the given `str` -> `str` `renames` map, translate `edn-schema` into a
-  map with adjusted package names."
-  [edn-schema renames]
-  (walk/prewalk
-   (fn [form]
-     (if (keyword? form)
-       (if-let [ns (namespace form)]
-         (keyword (renames ns ns) (name form))
-         form)
-       form))
-   edn-schema))
-
 (defn- unfuck-enums [schema]
   (let [enums (into #{} (for [[k v] schema :when (:enum? v)] k))]
     (walk/postwalk
