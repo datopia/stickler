@@ -1,4 +1,4 @@
-package io.datopia.stickler;
+package org.datopia.stickler;
 
 import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;

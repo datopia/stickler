@@ -1,7 +1,7 @@
 (ns stickler.codec
   (:import [java.io ByteArrayOutputStream ByteArrayInputStream]
            [java.nio.charset Charset]
-           [io.datopia.stickler CodecUtil]))
+           [org.datopia.stickler CodecUtil]))
 
 (def ^:private tag-type-bits      3)
 (def ^:private repeated-wire-type 2)

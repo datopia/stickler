@@ -1,4 +1,4 @@
-(defproject org.datopia/stickler-translate "0.1.1-SNAPSHOT"
+(defproject org.datopia/stickler-translate "0.1.2-SNAPSHOT"
   :description  "protobuf3 -> EDN schema generator."
   :url          "https://github.com/datopia/stickler"
   :license      {:name "MIT License"
@@ -10,9 +10,12 @@
   :main         stickler.translate
   :aot          [stickler.translate]
   :profiles
-  {:dev {:global-vars  {*warn-on-reflection* true}
-         :dependencies [[io.datopia/codox-theme "0.1.0"]]
-         :plugins      [[lein-codox "0.10.5"]]
-         :codox        {:namespaces [#"^stickler\."]
-                        :metadata   {:doc/format :markdown}
-                        :themes     [:default [:datopia {:datopia/github "https://github.com/datopia/stickler"}]]}}})
+  {:dev
+   {:global-vars  {*warn-on-reflection* true}
+    :dependencies [[io.datopia/codox-theme "0.1.0"]]
+    :plugins      [[lein-codox "0.10.5"]]
+    :codox        {:namespaces [#"^stickler\."]
+                    :metadata   {:doc/format :markdown}
+                   :themes
+                   [:default [:datopia
+                              {:datopia/github "https://github.com/datopia/stickler"}]]}}})

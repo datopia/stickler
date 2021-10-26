@@ -7,7 +7,7 @@
             [clojure.string          :as    str]
             [clojure.pprint          :refer [pprint]])
   (:import [com.squareup.wire.schema
-            Schema SchemaLoader ProtoType OneOf IdentifierSet$Builder ProtoMember Type])
+            Schema SchemaLoader ProtoType OneOf ProtoMember Type])
   (:gen-class))
 
 (defn- un-underscore [s]
@@ -121,32 +121,6 @@
    {}
    (.types f)))
 
-(defn- map->IdentifierSet [incl-excl]
-  (as-> (IdentifierSet$Builder.) ^IdentifierSet$Builder b
-    (reduce #(.include ^IdentifierSet$Builder %1 %2) b (:include incl-excl))
-    (reduce #(.exclude ^IdentifierSet$Builder %1 %2) b (:exclude incl-excl))
-    (.build b)))
-
-(defn prune-Schema
-  "Prune the given `schema` such that the sequences of string
-  identifiers in `prune-spec`'s `:include` and `:exclude` keys are
-  included/excluded, respectively."
-  [^Schema schema prune-spec]
-  (.prune schema (map->IdentifierSet prune-spec)))
-
-(defn rename-packages
-  "Using the given `str` -> `str` `renames` map, translate `edn-schema` into a
-  map with adjusted package names."
-  [edn-schema renames]
-  (walk/prewalk
-   (fn [form]
-     (if (keyword? form)
-       (if-let [ns (namespace form)]
-         (keyword (renames ns ns) (name form))
-         form)
-       form))
-   edn-schema))
-
 (defn- unfuck-enums [schema]
   (let [enums (into #{} (for [[k v] schema :when (:enum? v)] k))]
     (walk/postwalk
@@ -164,6 +138,21 @@
        (map convert-proto-file)
        (apply merge)
        unfuck-enums))
+
+(defn- direct-deps [schema k]
+  (when-not (:enum? (k schema))
+    (for [v (-> k schema :fields vals) :when (not (:scalar? v))]
+      (:type v))))
+
+(defn prune-edn [schema {incl :include}]
+  (let [incl (map keyword incl)
+        deps (loop [[k & incl] incl
+                    acc        []]
+               (if (not k)
+                 acc
+                 (let [deps (direct-deps schema k)]
+                   (recur (into incl deps) (into acc deps)))))]
+    (select-keys schema (into deps incl))))
 
 (defn- dirs->loader [& dirs]
   (reduce

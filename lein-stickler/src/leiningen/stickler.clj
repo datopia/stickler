@@ -16,9 +16,16 @@
 
    :dirs /proto ...
       A sequence of absolute directories to process into a protobuf schema.
-   The EDN is pretty-printed to stdout"
+   The EDN is pretty-printed to stdout
+
+   :include a.b/C ...
+      An optional sequence of fully qualified type names. Output
+  will be restricted to those types and their transitive dependencies.
+    "
   [_ & args]
   (let [args (parse-args args)]
     (-> (apply translate/dirs->Schema (:dirs args))
         translate/Schema->edn
+        (cond-> (:include args)
+          (translate/prune-edn args))
         pprint/pprint)))
