@@ -74,6 +74,9 @@ $ lein stickler :dirs proto :include my.test/Nested :strip-ns my
  ...}
 ```
 
+## Missing Features
+ - Maps are not supported.  I can add support for this if anyone's interested.
+
 ## Subprojects
 
 ### [org.datopia/stickler-translate](translate)
@@ -82,6 +85,13 @@ protobuf->edn schema generation library.
 
 [![Clojars
 Project](http://clojars.org/org.datopia/stickler-translate/latest-version.svg)](http://clojars.org/org.datopia/stickler-translate)
+
+### [org.datopia/lein-stickler](lein-stickler)
+
+protobuf->edn schema generation library.
+
+[![Clojars
+Project](http://clojars.org/org.datopia/lein-stickler/latest-version.svg)](http://clojars.org/org.datopia/lein-stickler)
 
 ### [org.datopia/stickler-codec](codec)
 
