@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package my.test;
+
+message Nested {
+  Inner inner = 1;
+
+  message Inner {
+    bool inner = 1;
+  }
+}

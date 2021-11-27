@@ -1,4 +1,4 @@
-(defproject org.datopia/stickler-translate "0.1.2-SNAPSHOT"
+(defproject org.datopia/stickler-translate "0.1.1"
   :description  "protobuf3 -> EDN schema generator."
   :url          "https://github.com/datopia/stickler"
   :license      {:name "MIT License"
