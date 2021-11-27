@@ -2,10 +2,10 @@
 
 Clojure-idiomatic protobuf3 schema generation & codec functionality.
 
-A [Leiningen](https://leiningen.org/) plugin (`org.datopia/lein-stickler`
-[Wire](https://github.com/square/wire) parses protobuf3 files, outputting an EDN
-map describing the schema. Your project need only depend on
-`org.datopia/stickler-codec`, a zero-dependency protobuf3<->EDN3 codec. When
+The [Leiningen](https://leiningen.org/) plugin [org.datopia/lein-stickler](lein-stickler) uses [Wire](https://github.com/square/wire) (via [org.datopia/stickler-translate](translate)) to parse protobuf3 files, outputting an EDN map describing the schema.
+
+Your project need only depend on
+[org.datopia/stickler-codec](stickler-codec), a zero-dependency protobuf3<->EDN3 codec. When
 provided with an appropriate EDN schema, it can encode and decode arbitrary
 protobuf3 messages as maps.
 
@@ -21,7 +21,6 @@ files. The resulting EDN is printed to stdout.
 
 Let's imagine we've a directory `~/proto` containing the file `test.proto`:
 
-* test.proto
 ```protobuf
 syntax = "proto3"
 
